@@ -6,88 +6,81 @@ import requests
 from dateutil import parser
 from urllib.parse import urljoin
 from wget import download
+import zipfile
+
+from .base import DataDownloader, FileInfo
 
 
-BASE_URL = "https://disclosurespreview.house.gov/"
+class LdBaseDownloader(DataDownloader):
 
-BASE_DATA_URL = urljoin(BASE_URL, "data/")
+    BASE_URL = "https://disclosurespreview.house.gov/"
 
-LD_JSON_PATHS = {
-    "ld1": "LD/LdSearchPastFilings.json",
-    "ld2": "LD/LdSearchPastFilings.json",
-    "ld203": "LC/LcSearchPastFilings.json"
-}
+    BASE_DATA_URL = urljoin(BASE_URL, "data/")
 
-LD_NAME_REGEX = {
-    "ld1": r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)",
-    "ld2": r"({year})\s*(Registrations)\s*XML\s*\((.+)\)",
-    "ld203": r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)",
-}
+    JSON_FILE_PATH = "LD/LdSearchPastFilings.json"
 
-def base_ld_download(ld_type, out_dir, year, local_update_times, debug):
-    print(
-        "Downloading {} data {}".format(
-            ld_type,
-            f"from year {year}" if year is not None else ""
-        )
-    )
+    NAME_FILTER = None
 
-    # Fetch the JSON with all file information
-    print("Fetching past filings JSON...")
-    past_filings_json_url = urljoin(BASE_DATA_URL, LD_JSON_PATHS[ld_type])
-    resp = requests.get(past_filings_json_url)
-    info = resp.json()
-    
-    # Filter entries by year
-    year_filter = r"\d\d\d\d" if year is None else year
-    name_regex = LD_NAME_REGEX[ld_type].format(year=year_filter)
-    items = [
-        item for item in info 
-        if re.match(name_regex, item.get("name", ""))
-    ]
+    PREFIX_PATH = None
 
-    assert items, f"No data found: {resp.text}"
-    print(f"Downloading {len(items)} file(s)")
-    # Download each zip
-    new_update_times = {}
-    prefix = "LD/" if ld_type in ["ld1", 'ld2'] else "LC/"
-    for item in items:
-        # Create output filename
-        file_url = urljoin(urljoin(BASE_DATA_URL, prefix), item["file"])
-        dst = os.path.join(out_dir, prefix, item["file"])
-        dst = os.path.abspath(dst)
+    def __init__(self, out_dir, updated_times, data_type, debug=False, year=None):
+        super().__init__(out_dir, updated_times, data_type=data_type, debug=debug)
+        self.year = year
 
-        # Check if the file needs to be updated
-        _, _, remote_time = re.match(name_regex, item["name"]).groups()
-        if dst in local_update_times:
-            remote_update_time = parser.parse(remote_time)
-            local_update_time = parser.parse(local_update_times[dst])
-            if remote_update_time == local_update_time:
-                print(f"Skipping {file_url} since it hasn't changed")
-                continue
+    def get_file_infos(self):
+        # Fetch the JSON with all file information
+        print("Fetching past filings JSON...")
+        past_filings_json_url = urljoin(self.BASE_DATA_URL, self.JSON_FILE_PATH)
+        resp = requests.get(past_filings_json_url)
+        info = resp.json()
 
-        # Create parent directories
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        
-        # Download the file
-        print(f"\n{file_url} -> {dst} ...")
-        if not debug:
-            download(file_url, dst)
+        # Filter entries by year
+        year_filter = r"\d\d\d\d" if self.year is None else self.year
+        name_regex = self.NAME_FILTER.format(year=year_filter)
+        items = [
+            item for item in info
+            if re.match(name_regex, item.get("name", ""))
+        ]
 
-        new_update_times[dst] = remote_time
-    
-    return new_update_times
+        assert items, f"No data found using {name_regex}: {resp.text}"
 
-def ld1_download(out_dir, year, update_times, debug):
-    return base_ld_download("ld1", out_dir, year, update_times, debug)
-
-def ld2_download(out_dir, year, update_times, debug):
-    return base_ld_download("ld2", out_dir, year, update_times, debug)
-
-def ld203_download(out_dir, year, update_times, debug):
-    return base_ld_download("ld203", out_dir, year, update_times, debug)
+        return [
+            FileInfo(name=item["file"],
+                     remote_url= urljoin(urljoin(self.BASE_DATA_URL, self.PREFIX_PATH), item["file"]),
+                     local_dir=self.PREFIX_PATH,
+                     modified=re.match(name_regex, item["name"]).groups()[2])
+            for item in items
+        ]
 
 
-ld1 = ld1_download
-ld2 = ld2_download
-ld203 = ld203_download
+class Ld1Downloader(LdBaseDownloader):
+    NAME_FILTER = r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)"
+    PREFIX_PATH = "LD/"
+    def __init__(self, out_dir, updated_times, year, debug):
+        super().__init__(out_dir, updated_times, year=year, data_type="ld1", debug=debug)
+
+
+class Ld2Downloader(LdBaseDownloader):
+    NAME_FILTER = r"({year})\s*(Registrations)\s*XML\s*\((.+)\)"
+    PREFIX_PATH = "LD/"
+    def __init__(self, out_dir, updated_times, year, debug):
+        super().__init__(out_dir, updated_times, year=year, data_type="ld2", debug=debug)
+
+
+class Ld203Downloader(LdBaseDownloader):
+    NAME_FILTER = r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)"
+    PREFIX_PATH = "LC/"
+    def __init__(self, out_dir, updated_times, year, debug):
+        super().__init__(out_dir, updated_times, year=year, data_type="ld203", debug=debug)
+
+
+def ld1(out_dir, updated_times, year, debug):
+    return Ld1Downloader(out_dir, updated_times, year, debug).download()
+
+
+def ld2(out_dir, updated_times, year, debug):
+    return Ld2Downloader(out_dir, updated_times, year, debug).download()
+
+
+def ld203(out_dir, updated_times, year, debug):
+    return Ld203Downloader(out_dir, updated_times, year, debug).download()

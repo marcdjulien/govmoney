@@ -5,10 +5,10 @@ import json
 import os
 
 from govmoney import (
-	ld1, 
-	ld2, 
-	ld203, 
-	schda, 
+	ld1,
+	ld2,
+	ld203,
+	schda,
 	schdb
 )
 
@@ -29,7 +29,7 @@ parser.add_argument("-y", "--year",
 
 parser.add_argument("-d", "--directory",
                     default="data",
-                    dest="out_dir", 
+                    dest="out_dir",
                     help="The output directory")
 
 parser.add_argument("-f", "--force",
@@ -76,13 +76,12 @@ except:
 	print(f"{args.update_times} not found")
 	update_times = {}
 
-
 if args.force:
 	update_times = {}
 
-new_updated_times = options[args.data_type](args.out_dir, 
-									        args.year, 
-									        update_times, 
+new_updated_times = options[args.data_type](args.out_dir,
+									        update_times,
+									        args.year,
 									        args.debug)
 
 update_times.update(new_updated_times)
