@@ -17,7 +17,7 @@ class LdBaseDownloader(DataDownloader):
 
     BASE_DATA_URL = urljoin(BASE_URL, "data/")
 
-    JSON_FILE_PATH = "LD/LdSearchPastFilings.json"
+    JSON_FILE_PATH = None
 
     NAME_FILTER = None
 
@@ -54,20 +54,23 @@ class LdBaseDownloader(DataDownloader):
 
 
 class Ld1Downloader(LdBaseDownloader):
-    NAME_FILTER = r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)"
+    JSON_FILE_PATH = "LD/LdSearchPastFilings.json"
+    NAME_FILTER = r"({year})\s*(Registrations)\s*XML\s*\((.+)\)"
     PREFIX_PATH = "LD/"
     def __init__(self, out_dir, updated_times, year, debug):
         super().__init__(out_dir, updated_times, year=year, data_type="ld1", debug=debug)
 
 
 class Ld2Downloader(LdBaseDownloader):
-    NAME_FILTER = r"({year})\s*(Registrations)\s*XML\s*\((.+)\)"
+    JSON_FILE_PATH = "LD/LdSearchPastFilings.json"
+    NAME_FILTER = r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)"
     PREFIX_PATH = "LD/"
     def __init__(self, out_dir, updated_times, year, debug):
         super().__init__(out_dir, updated_times, year=year, data_type="ld2", debug=debug)
 
 
 class Ld203Downloader(LdBaseDownloader):
+    JSON_FILE_PATH = "LC/LcSearchPastFilings.json"
     NAME_FILTER = r"({year})\s*([1234MY].+)\s*XML\s*\((.+)\)"
     PREFIX_PATH = "LC/"
     def __init__(self, out_dir, updated_times, year, debug):

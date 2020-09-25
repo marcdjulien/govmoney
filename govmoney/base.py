@@ -61,5 +61,3 @@ class DataDownloader(object):
     def get_file_infos(self):
         """Returns a list of FileInfo objects for this site."""
         raise NotImplemented
-
-
